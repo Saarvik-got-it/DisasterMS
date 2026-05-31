@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import L, { type LeafletMouseEvent } from "leaflet"
+import L from "leaflet"
 import {
   MapContainer,
   Marker,
@@ -29,7 +29,7 @@ function MapUpdater({ center }: { center: [number, number] }) {
 
 function ClickHandler({ onSelect }: { onSelect: (lat: number, lon: number) => void }) {
   useMapEvents({
-    click(event: LeafletMouseEvent) {
+    click(event) {
       onSelect(event.latlng.lat, event.latlng.lng)
     },
   })
