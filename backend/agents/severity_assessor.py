@@ -49,13 +49,19 @@ def _extract_gemini_text(payload: Dict[str, Any]) -> str | None:
     candidates = payload.get("candidates") or []
     if not candidates:
         return None
-    content = candidates[0].get("content") or {}
-    parts = content.get("parts") or []
-    for part in parts:
-        text = part.get("text") if isinstance(part, dict) else None
-        if text:
-            return str(text)
-    return None
+    collected_parts: List[str] = []
+    for candidate in candidates:
+        content = candidate.get("content") or {}
+        parts = content.get("parts") or []
+        for part in parts:
+            text = part.get("text") if isinstance(part, dict) else None
+            if text:
+                collected_parts.append(str(text))
+
+    if not collected_parts:
+        return None
+
+    return "\n".join(collected_parts)
 
 
 def _build_prompt(
@@ -76,7 +82,9 @@ def _build_prompt(
     instructions = (
         "You are an emergency operations analyst.\n"
         "Evaluate forecast features, ML prediction probabilities, and real-world news context.\n"
-        "Return only a JSON object with keys 'severity' and 'reason'.\n"
+        "Return exactly one JSON object with keys 'severity' and 'reason'.\n"
+        "Do not include markdown, code fences, commentary, or any prefix text.\n"
+        "The first character of your response must be '{' and the last character must be '}'.\n"
         "Severity must be one of: LOW, MEDIUM, HIGH, CRITICAL.\n"
         "Example output: {\"severity\": \"HIGH\", \"reason\": \"...\"}\n"
     )
@@ -223,6 +231,12 @@ def assess_severity(
         try:
             return SeverityAssessment.model_validate_json(parsed)
         except (ValidationError, ValueError) as exc:
+            repaired = _repair_json_response(content)
+            if repaired is not None:
+                try:
+                    return SeverityAssessment.model_validate_json(repaired)
+                except (ValidationError, ValueError):
+                    pass
             logger.warning(
                 "LLM response parse failed; using fallback. error=%s response=%s",
                 exc,
@@ -248,9 +262,12 @@ def _extract_json_object(text: str) -> str:
             candidate = part.strip()
             if candidate.startswith("json"):
                 candidate = candidate[4:].strip()
-            if candidate.startswith("{") and candidate.endswith("}"):
+            start = candidate.find("{")
+            end = candidate.rfind("}")
+            if start != -1 and end != -1 and end > start:
+                extracted = candidate[start : end + 1]
                 logger.info("Extracted JSON from fenced block")
-                return candidate
+                return extracted
 
     start = stripped.find("{")
     end = stripped.rfind("}")
@@ -260,6 +277,38 @@ def _extract_json_object(text: str) -> str:
         return candidate
 
     return stripped
+
+
+def _repair_json_response(text: str) -> str | None:
+    """Try to salvage malformed model output by extracting or repairing JSON-like content."""
+    stripped = text.strip()
+    if not stripped:
+        return None
+
+    # Try a simple heuristic: strip common prefix sentences and look again for JSON markers.
+    markers = ["{", "["]
+    for marker in markers:
+        idx = stripped.find(marker)
+        if idx != -1:
+            candidate = stripped[idx:]
+            if marker == "{":
+                end = candidate.rfind("}")
+                if end != -1:
+                    return candidate[: end + 1]
+            elif marker == "[":
+                end = candidate.rfind("]")
+                if end != -1:
+                    return candidate[: end + 1]
+
+    # If the model emitted a dangling code fence or preamble, try to locate JSON fragments inside it.
+    if "```" in stripped:
+        after_fence = stripped.split("```", 1)[-1].strip()
+        start = after_fence.find("{")
+        end = after_fence.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            return after_fence[start : end + 1]
+
+    return None
 
 
 def severity_assessor_node(state: DisasterState) -> DisasterState:

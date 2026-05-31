@@ -325,5 +325,4 @@ Nominatim search uses OpenStreetMap public endpoints and does not require an API
 
 ## Deployment
 
-- Run with `uvicorn backend.api.main:app --host 0.0.0.0 --port 8000`.
-- Containerization and orchestration planned for later phases.
+- See [README_DEPLOYMENT.md](README_DEPLOYMENT.md) for step-by-step Vercel and Render deployment instructions.
