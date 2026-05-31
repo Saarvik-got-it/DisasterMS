@@ -63,14 +63,15 @@ export default function MapInner({
     )
   }
 
+  const mapContainerProps: any = {
+    center,
+    zoom: 10,
+    scrollWheelZoom: true,
+    className: "h-72 w-full rounded-2xl border border-border/60",
+  }
+
   return (
-    <MapContainer
-      key={mapKey}
-      center={center}
-      zoom={10}
-      scrollWheelZoom
-      className="h-72 w-full rounded-2xl border border-border/60"
-    >
+    <MapContainer key={mapKey} {...mapContainerProps}>
       <TileLayer
         attribution="&copy; OpenStreetMap"
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
