@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import L from "leaflet"
+import L, { type LeafletMouseEvent } from "leaflet"
 import {
   MapContainer,
   Marker,
@@ -29,7 +29,7 @@ function MapUpdater({ center }: { center: [number, number] }) {
 
 function ClickHandler({ onSelect }: { onSelect: (lat: number, lon: number) => void }) {
   useMapEvents({
-    click(event: { latlng: { lat: number; lng: number } }) {
+    click(event: LeafletMouseEvent) {
       onSelect(event.latlng.lat, event.latlng.lng)
     },
   })
@@ -63,15 +63,14 @@ export default function MapInner({
     )
   }
 
-  const mapContainerProps: any = {
-    center,
-    zoom: 10,
-    scrollWheelZoom: true,
-    className: "h-72 w-full rounded-2xl border border-border/60",
-  }
-
   return (
-    <MapContainer key={mapKey} {...mapContainerProps}>
+    <MapContainer
+      key={mapKey}
+      center={center}
+      zoom={10}
+      scrollWheelZoom
+      className="h-72 w-full rounded-2xl border border-border/60"
+    >
       <TileLayer
         attribution="&copy; OpenStreetMap"
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
